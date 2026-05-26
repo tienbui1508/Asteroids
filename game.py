@@ -8,11 +8,10 @@ from constants import (
     PLAYER_NAME_MAX_LENGTH,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
-    TOUCH_CONTROLS_TOGGLE_HEIGHT,
-    TOUCH_CONTROLS_TOGGLE_MARGIN,
-    TOUCH_CONTROLS_TOGGLE_WIDTH,
 )
 from game_state import START_KEYS, GameState
+from fullscreen import toggle_fullscreen
+from input_coords import is_primary_pointer_down, is_synthetic_mouse, pointer_position
 from logger import log_event
 from high_scores import record_high_score
 from player import Player
@@ -27,7 +26,11 @@ from ui import (
     WELCOME_TITLE,
     draw_hud,
     draw_message_screen,
+    TOUCH_CONTROLS_TOGGLE_HIT_PADDING,
+    draw_fullscreen_toggle,
     draw_touch_controls_toggle,
+    fullscreen_toggle_rect,
+    touch_controls_toggle_rect,
 )
 
 
@@ -57,6 +60,8 @@ class Game:
         self.player = Player(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
         self.touch_controls = TouchControls(enabled=False)
         self.player.touch_controls = self.touch_controls
+        self._last_touch_toggle_ms = -1_000_000
+        self._last_fullscreen_toggle_ms = -1_000_000
 
     def reset(self) -> None:
         for sprite in list(self.asteroids):
@@ -80,32 +85,46 @@ class Game:
     def _menu_tap(self, event: pygame.event.Event) -> bool:
         if event.type == pygame.FINGERDOWN:
             return True
-        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+        if is_synthetic_mouse(event):
+            return False
+        return event.type == pygame.MOUSEBUTTONDOWN and event.button in (0, 1)
 
-    def _event_pos(self, event: pygame.event.Event) -> pygame.Vector2 | None:
-        if event.type in (pygame.FINGERDOWN, pygame.FINGERUP, pygame.FINGERMOTION):
-            return pygame.Vector2(event.x * SCREEN_WIDTH, event.y * SCREEN_HEIGHT)
-        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
-            if getattr(event, "button", 0) == 1:
-                return pygame.Vector2(event.pos)
-        return None
+    def _toggle_touch_controls(self) -> None:
+        now = pygame.time.get_ticks()
+        if now - self._last_touch_toggle_ms < 250:
+            return
+        self._last_touch_toggle_ms = now
+        self.touch_controls.set_enabled(not self.touch_controls.enabled)
+
+    def _toggle_fullscreen(self) -> None:
+        now = pygame.time.get_ticks()
+        if now - self._last_fullscreen_toggle_ms < 250:
+            return
+        self._last_fullscreen_toggle_ms = now
+        toggle_fullscreen()
 
     def _touch_toggle_tap(self, event: pygame.event.Event) -> bool:
-        if event.type != pygame.FINGERDOWN and not (
-            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-        ):
+        if not is_primary_pointer_down(event):
             return False
 
-        pos = self._event_pos(event)
+        pos = pointer_position(event)
         if pos is None:
             return False
 
-        rect = pygame.Rect(
-            SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_MARGIN - TOUCH_CONTROLS_TOGGLE_WIDTH,
-            TOUCH_CONTROLS_TOGGLE_MARGIN,
-            TOUCH_CONTROLS_TOGGLE_WIDTH,
-            TOUCH_CONTROLS_TOGGLE_HEIGHT,
+        rect = touch_controls_toggle_rect(
+            hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING
         )
+        return rect.collidepoint(pos.x, pos.y)
+
+    def _fullscreen_toggle_tap(self, event: pygame.event.Event) -> bool:
+        if not is_primary_pointer_down(event):
+            return False
+
+        pos = pointer_position(event)
+        if pos is None:
+            return False
+
+        rect = fullscreen_toggle_rect(hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING)
         return rect.collidepoint(pos.x, pos.y)
 
     def _confirm_player_name(self) -> None:
@@ -175,8 +194,14 @@ class Game:
             return False
 
         if self.state == GameState.PLAYING:
-            if self._touch_toggle_tap(event):
-                self.touch_controls.set_enabled(not self.touch_controls.enabled)
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_t:
+                self._toggle_touch_controls()
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_f:
+                self._toggle_fullscreen()
+            elif self._touch_toggle_tap(event):
+                self._toggle_touch_controls()
+            elif self._fullscreen_toggle_tap(event):
+                self._toggle_fullscreen()
             else:
                 self.touch_controls.handle_event(event)
 
@@ -226,6 +251,7 @@ class Game:
 
         if self.state == GameState.PLAYING:
             draw_hud(screen, self.score, self.player_name)
+            draw_fullscreen_toggle(screen)
             draw_touch_controls_toggle(screen, self.touch_controls.enabled)
             self.touch_controls.draw(screen)
         else:

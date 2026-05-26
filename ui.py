@@ -26,6 +26,36 @@ GAME_OVER_TITLE = "GAME OVER"
 GAME_OVER_LINES = ["You were hit by an asteroid."]
 GAME_OVER_PROMPT = "Press ENTER or tap to play again"
 
+TOUCH_CONTROLS_TOGGLE_HIT_PADDING = 12
+
+
+def touch_controls_toggle_rect(*, hit_padding: int = 0) -> pygame.Rect:
+    rect = pygame.Rect(
+        SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_MARGIN - TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_MARGIN,
+        TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    )
+    if hit_padding:
+        rect = rect.inflate(hit_padding * 2, hit_padding * 2)
+    return rect
+
+
+def fullscreen_toggle_rect(*, hit_padding: int = 0) -> pygame.Rect:
+    rect = pygame.Rect(
+        SCREEN_WIDTH
+        - TOUCH_CONTROLS_TOGGLE_MARGIN
+        - TOUCH_CONTROLS_TOGGLE_WIDTH
+        - TOUCH_CONTROLS_TOGGLE_MARGIN
+        - TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_MARGIN,
+        TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    )
+    if hit_padding:
+        rect = rect.inflate(hit_padding * 2, hit_padding * 2)
+    return rect
+
 
 def draw_message_screen(
     screen: pygame.Surface,
@@ -76,12 +106,22 @@ def draw_touch_controls_toggle(screen: pygame.Surface, enabled: bool) -> None:
         True,
         TOUCH_CONTROL_TEXT_COLOR,
     )
-    rect = pygame.Rect(
-        SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_MARGIN - TOUCH_CONTROLS_TOGGLE_WIDTH,
-        TOUCH_CONTROLS_TOGGLE_MARGIN,
-        TOUCH_CONTROLS_TOGGLE_WIDTH,
-        TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    rect = touch_controls_toggle_rect()
+    pygame.draw.rect(screen, TOUCH_CONTROLS_TOGGLE_BG_COLOR, rect, border_radius=8)
+    pygame.draw.rect(
+        screen,
+        TOUCH_CONTROLS_TOGGLE_BORDER_COLOR,
+        rect,
+        width=2,
+        border_radius=8,
     )
+    screen.blit(label, label.get_rect(center=rect.center))
+
+
+def draw_fullscreen_toggle(screen: pygame.Surface) -> None:
+    font = pygame.font.Font(None, 28)
+    label = font.render("FULLSCREEN", True, TOUCH_CONTROL_TEXT_COLOR)
+    rect = fullscreen_toggle_rect()
     pygame.draw.rect(screen, TOUCH_CONTROLS_TOGGLE_BG_COLOR, rect, border_radius=8)
     pygame.draw.rect(
         screen,

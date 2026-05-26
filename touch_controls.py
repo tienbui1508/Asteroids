@@ -19,6 +19,7 @@ from constants import (
     TOUCH_JOYSTICK_RADIUS,
     TOUCH_CONTROL_TEXT_COLOR,
 )
+from input_coords import is_synthetic_mouse, pointer_position
 
 MOUSE_POINTER_ID = -1
 
@@ -91,17 +92,29 @@ class TouchControls:
             return
 
         if event.type == pygame.FINGERDOWN:
-            self._on_press(event.finger_id, self._finger_pos(event))
+            self._on_press(event.finger_id, pointer_position(event))
         elif event.type == pygame.FINGERMOTION:
-            self._on_motion(event.finger_id, self._finger_pos(event))
+            pos = pointer_position(event)
+            if pos is not None:
+                self._on_motion(event.finger_id, pos)
         elif event.type == pygame.FINGERUP:
             self._on_release(event.finger_id)
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self._on_press(MOUSE_POINTER_ID, pygame.Vector2(event.pos))
-        elif event.type == pygame.MOUSEMOTION and event.buttons[0]:
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (0, 1):
+            if is_synthetic_mouse(event):
+                return
+            pos = pointer_position(event)
+            if pos is not None:
+                self._on_press(MOUSE_POINTER_ID, pos)
+        elif event.type == pygame.MOUSEMOTION and any(event.buttons):
+            if is_synthetic_mouse(event):
+                return
             if self._joystick_pointer == MOUSE_POINTER_ID:
-                self._on_motion(MOUSE_POINTER_ID, pygame.Vector2(event.pos))
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                pos = pointer_position(event)
+                if pos is not None:
+                    self._on_motion(MOUSE_POINTER_ID, pos)
+        elif event.type == pygame.MOUSEBUTTONUP and event.button in (0, 1):
+            if is_synthetic_mouse(event):
+                return
             self._on_release(MOUSE_POINTER_ID)
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -130,9 +143,6 @@ class TouchControls:
         label = font.render("FIRE", True, TOUCH_CONTROL_TEXT_COLOR)
         label_rect = label.get_rect(center=self.fire_rect.center)
         screen.blit(label, label_rect)
-
-    def _finger_pos(self, event: pygame.event.Event) -> pygame.Vector2:
-        return pygame.Vector2(event.x * SCREEN_WIDTH, event.y * SCREEN_HEIGHT)
 
     def _on_press(self, pointer_id: int, pos: pygame.Vector2) -> None:
         if self._joystick_pointer is None and self._in_joystick_zone(pos):
