@@ -5,6 +5,7 @@ import sys
 from asteroid import Asteroid
 from asteroidfield import AsteroidField
 from constants import (
+    GAME_STATS_FILE,
     HIGH_SCORES_FILE,
     PLAYER_NAME_MAX_LENGTH,
     SCREEN_HEIGHT,
@@ -18,6 +19,7 @@ from input_coords import (
     pointer_position,
 )
 from logger import log_event
+from game_stats import load_games_played, record_game_played
 from high_scores import record_high_score
 from player import Player
 from shot import Shot
@@ -29,15 +31,17 @@ from ui import (
     WELCOME_LINES,
     WELCOME_PROMPT,
     WELCOME_TITLE,
+    draw_dim_overlay,
+    draw_game_over_screen,
     draw_hud,
-    draw_message_screen,
     TOUCH_CONTROLS_TOGGLE_HIT_PADDING,
     draw_fullscreen_toggle,
     draw_touch_controls_toggle,
-    draw_set_name_button,
+    draw_welcome_screen,
+    format_games_played_line,
     fullscreen_toggle_rect,
-    set_name_button_rect,
     touch_controls_toggle_rect,
+    welcome_set_name_button_rect,
 )
 
 
@@ -52,6 +56,8 @@ class Game:
         self.high_scores = []
         self._has_recorded_high_score = False
         self._high_scores_path = Path(__file__).with_name(HIGH_SCORES_FILE)
+        self._stats_path = Path(__file__).with_name(GAME_STATS_FILE)
+        self.games_played = load_games_played(self._stats_path)
 
         self.updatable = pygame.sprite.Group()
         self.drawable = pygame.sprite.Group()
@@ -88,6 +94,7 @@ class Game:
         self.reset()
         self._has_recorded_high_score = False
         self.high_scores = []
+        self.games_played = record_game_played(self._stats_path)
         self.state = GameState.PLAYING
 
     def _menu_tap(self, event: pygame.event.Event) -> bool:
@@ -102,9 +109,7 @@ class Game:
 
         # Don't treat taps on the "SET NAME" button as "start game".
         pos = pointer_position(event)
-        if pos is not None and set_name_button_rect(
-            hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING
-        ).collidepoint(pos.x, pos.y):
+        if pos is not None and self._welcome_set_name_rect().collidepoint(pos.x, pos.y):
             return False
 
         return True
@@ -175,6 +180,21 @@ class Game:
         sanitized = sanitized[:PLAYER_NAME_MAX_LENGTH]
         self.player_name_input = sanitized
 
+    def _welcome_body_lines(self) -> list[str]:
+        return WELCOME_LINES + [""]
+
+    def _welcome_player_name_line(self) -> str:
+        return f"Player name: {self.player_name_input}_"
+
+    def _welcome_set_name_rect(self) -> pygame.Rect:
+        return welcome_set_name_button_rect(
+            self._welcome_body_lines(),
+            games_played_line=format_games_played_line(self.games_played),
+            player_name_line=self._welcome_player_name_line(),
+            prompt=WELCOME_PROMPT,
+            hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING,
+        )
+
     def _set_name_button_tap(self, event: pygame.event.Event) -> bool:
         now = pygame.time.get_ticks()
         # Debounce based on prompt close time (user may spend time typing).
@@ -186,8 +206,7 @@ class Game:
         pos = pointer_position(event)
         if pos is None:
             return False
-        rect = set_name_button_rect(hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING)
-        return rect.collidepoint(pos.x, pos.y)
+        return self._welcome_set_name_rect().collidepoint(pos.x, pos.y)
 
     def _handle_welcome_keydown(self, event: pygame.event.Event) -> None:
         # Confirm name and start
@@ -294,14 +313,13 @@ class Game:
 
     def draw(self, screen: pygame.Surface) -> None:
         if self.state == GameState.WELCOME:
-            display_input = self.player_name_input + "_"
-            draw_message_screen(
+            draw_welcome_screen(
                 screen,
-                WELCOME_TITLE,
-                WELCOME_LINES + [f"Player name: {display_input}"],
-                WELCOME_PROMPT,
+                games_played_line=format_games_played_line(self.games_played),
+                body_lines=self._welcome_body_lines(),
+                player_name_line=self._welcome_player_name_line(),
+                prompt=WELCOME_PROMPT,
             )
-            draw_set_name_button(screen)
             return
 
         screen.fill("black")
@@ -321,12 +339,17 @@ class Game:
             else:
                 high_score_lines = ["No saved high scores yet."]
 
-            draw_message_screen(
+            draw_dim_overlay(screen)
+            draw_game_over_screen(
                 screen,
-                GAME_OVER_TITLE,
-                GAME_OVER_LINES
-                + [f"Player: {self.player_name}", f"Final score: {self.score}", ""]
-                + ["High scores:"] + high_score_lines,
-                GAME_OVER_PROMPT,
-                clear_background=False,
+                title=GAME_OVER_TITLE,
+                games_played_line=format_games_played_line(self.games_played),
+                summary_lines=GAME_OVER_LINES
+                + [
+                    "",
+                    f"Player: {self.player_name}",
+                    f"Final score: {self.score}",
+                ],
+                prompt=GAME_OVER_PROMPT,
+                leaderboard_lines=["High scores:"] + high_score_lines,
             )

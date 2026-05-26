@@ -59,6 +59,7 @@ Open the URL printed in the terminal (usually `http://localhost:8000`).
 - Asteroids spawn from screen edges and split when hit
 - Screen wrap for the player and asteroids; shots despawn off-screen
 - Score HUD and final score on game over
+- Global **games played** counter (Supabase + local fallback), shown on welcome and game over
 - Welcome screen, game over, and restart flow
 
 ## Project structure
@@ -90,6 +91,15 @@ logger.py        Boot.dev telemetry (optional local logs)
 - Game logic lives in `Game` (`game.py`); `main.py` only runs the async loop.
 - Sprite groups use Pygame’s container pattern (`Class.containers = (...)`).
 - `game_state.jsonl` / `game_events.jsonl` are written by `logger.py` for course telemetry and are gitignored.
+- For the global games-played counter, run `supabase_stats.sql` once in the Supabase SQL editor.
+- For the shared high-score leaderboard, run `supabase_high_scores.sql` once in the Supabase SQL editor.
+- Configure the Supabase client in `constants.py`:
+
+```python
+SUPABASE_URL = "https://<project-ref>.supabase.co"
+SUPABASE_ANON_KEY = "<anon-public-key>"
+SUPABASE_HIGH_SCORES_TABLE = "asteroids_high_scores"
+```
 
 ## Acknowledgments
 

@@ -12,3 +12,4 @@ wheels/
 game_state.jsonl
 game_events.jsonl
 asteroids_high_scores.json
+asteroids_stats.json
