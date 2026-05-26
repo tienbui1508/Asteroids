@@ -20,7 +20,7 @@ WELCOME_LINES = [
     "Touch: joystick to fly, FIRE to shoot",
     "Destroy asteroids. Don't get hit.",
 ]
-WELCOME_PROMPT = "Press ENTER or tap to play"
+WELCOME_PROMPT = "Type name then press ENTER (or tap)"
 
 GAME_OVER_TITLE = "GAME OVER"
 GAME_OVER_LINES = ["You were hit by an asteroid."]
@@ -60,10 +60,13 @@ def draw_message_screen(
     screen.blit(prompt_surface, prompt_rect)
 
 
-def draw_hud(screen: pygame.Surface, score: int) -> None:
+def draw_hud(screen: pygame.Surface, score: int, player_name: str) -> None:
     font = pygame.font.Font(None, 36)
-    label = font.render(f"Score: {score}", True, COLOR_FOREGROUND)
-    screen.blit(label, (16, 16))
+    name_label = font.render(f"{player_name}", True, COLOR_FOREGROUND)
+    screen.blit(name_label, (16, 16))
+
+    score_label = font.render(f"Score: {score}", True, COLOR_FOREGROUND)
+    screen.blit(score_label, (16, 16 + 40))
 
 
 def draw_touch_controls_toggle(screen: pygame.Surface, enabled: bool) -> None:

@@ -32,3 +32,16 @@ TOUCH_CONTROLS_TOGGLE_WIDTH = 210
 TOUCH_CONTROLS_TOGGLE_HEIGHT = 44
 TOUCH_CONTROLS_TOGGLE_BG_COLOR = (30, 30, 30)
 TOUCH_CONTROLS_TOGGLE_BORDER_COLOR = TOUCH_CONTROL_COLOR
+
+# High-score / player identity
+HIGH_SCORES_FILE = "asteroids_high_scores.json"
+HIGH_SCORES_MAX_ENTRIES = 10
+HIGH_SCORES_DISPLAY_ENTRIES = 5
+PLAYER_NAME_MAX_LENGTH = 12
+
+# Shared leaderboard (Supabase)
+# - Set these to enable a global high-score table for the web build.
+# - The anon key is OK to expose in a browser app.
+SUPABASE_URL = "https://jcqwpaoqyubjlldcbkwu.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjcXdwYW9xeXViamxsZGNia3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MDY1NjAsImV4cCI6MjA5NTM4MjU2MH0.62luJa8OimEczbS5_sSVKdfc9XNQWtSPdeoiETP6NN4"
+SUPABASE_HIGH_SCORES_TABLE = "asteroids_high_scores"
