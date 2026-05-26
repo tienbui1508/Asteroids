@@ -1,5 +1,6 @@
 import pygame
 from pathlib import Path
+import sys
 
 from asteroid import Asteroid
 from asteroidfield import AsteroidField
@@ -11,7 +12,11 @@ from constants import (
 )
 from game_state import START_KEYS, GameState
 from fullscreen import toggle_fullscreen
-from input_coords import is_primary_pointer_down, is_synthetic_mouse, pointer_position
+from input_coords import (
+    is_primary_pointer_down,
+    is_synthetic_mouse,
+    pointer_position,
+)
 from logger import log_event
 from high_scores import record_high_score
 from player import Player
@@ -29,7 +34,9 @@ from ui import (
     TOUCH_CONTROLS_TOGGLE_HIT_PADDING,
     draw_fullscreen_toggle,
     draw_touch_controls_toggle,
+    draw_set_name_button,
     fullscreen_toggle_rect,
+    set_name_button_rect,
     touch_controls_toggle_rect,
 )
 
@@ -62,6 +69,7 @@ class Game:
         self.player.touch_controls = self.touch_controls
         self._last_touch_toggle_ms = -1_000_000
         self._last_fullscreen_toggle_ms = -1_000_000
+        self._last_set_name_prompt_close_ms = -1_000_000
 
     def reset(self) -> None:
         for sprite in list(self.asteroids):
@@ -83,11 +91,23 @@ class Game:
         self.state = GameState.PLAYING
 
     def _menu_tap(self, event: pygame.event.Event) -> bool:
-        if event.type == pygame.FINGERDOWN:
-            return True
         if is_synthetic_mouse(event):
             return False
-        return event.type == pygame.MOUSEBUTTONDOWN and event.button in (0, 1)
+
+        if not (
+            event.type == pygame.FINGERDOWN
+            or (event.type == pygame.MOUSEBUTTONDOWN and event.button in (0, 1))
+        ):
+            return False
+
+        # Don't treat taps on the "SET NAME" button as "start game".
+        pos = pointer_position(event)
+        if pos is not None and set_name_button_rect(
+            hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING
+        ).collidepoint(pos.x, pos.y):
+            return False
+
+        return True
 
     def _toggle_touch_controls(self) -> None:
         now = pygame.time.get_ticks()
@@ -132,6 +152,42 @@ class Game:
         self.player_name = sanitized if sanitized else "NoobPlayer"
         # Keep the input in sync so the UI reflects the chosen name.
         self.player_name_input = self.player_name
+
+    def _set_player_name_from_prompt(self) -> None:
+        if sys.platform != "emscripten":
+            return
+        try:
+            from platform import window  # type: ignore
+
+            current = self.player_name_input or self.player_name or ""
+            result = window.prompt("Enter player name", current)
+        except Exception:
+            return
+        finally:
+            # The prompt is blocking; browsers may deliver a queued follow-up
+            # pointer event right after it closes. Debounce based on *close* time.
+            self._last_set_name_prompt_close_ms = pygame.time.get_ticks()
+
+        if not isinstance(result, str):
+            return
+
+        sanitized = "".join(ch for ch in result.strip() if ch.isalnum() or ch in ("-", "_"))
+        sanitized = sanitized[:PLAYER_NAME_MAX_LENGTH]
+        self.player_name_input = sanitized
+
+    def _set_name_button_tap(self, event: pygame.event.Event) -> bool:
+        now = pygame.time.get_ticks()
+        # Debounce based on prompt close time (user may spend time typing).
+        if now - self._last_set_name_prompt_close_ms < 600:
+            return False
+
+        if not is_primary_pointer_down(event):
+            return False
+        pos = pointer_position(event)
+        if pos is None:
+            return False
+        rect = set_name_button_rect(hit_padding=TOUCH_CONTROLS_TOGGLE_HIT_PADDING)
+        return rect.collidepoint(pos.x, pos.y)
 
     def _handle_welcome_keydown(self, event: pygame.event.Event) -> None:
         # Confirm name and start
@@ -181,6 +237,8 @@ class Game:
         if self.state == GameState.WELCOME:
             if event.type == pygame.KEYDOWN:
                 self._handle_welcome_keydown(event)
+            elif self._set_name_button_tap(event):
+                self._set_player_name_from_prompt()
             elif self._menu_tap(event):
                 self._confirm_player_name()
                 self.start_playing()
@@ -243,6 +301,7 @@ class Game:
                 WELCOME_LINES + [f"Player name: {display_input}"],
                 WELCOME_PROMPT,
             )
+            draw_set_name_button(screen)
             return
 
         screen.fill("black")

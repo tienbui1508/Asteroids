@@ -95,3 +95,13 @@ def is_primary_pointer_down(event: pygame.event.Event) -> bool:
             return False
         return getattr(event, "button", 0) in (0, 1)
     return False
+
+
+def is_primary_pointer_up(event: pygame.event.Event) -> bool:
+    if event.type == pygame.FINGERUP:
+        return True
+    if event.type == pygame.MOUSEBUTTONUP:
+        if is_synthetic_mouse(event):
+            return False
+        return getattr(event, "button", 0) in (0, 1)
+    return False

@@ -41,6 +41,18 @@ def touch_controls_toggle_rect(*, hit_padding: int = 0) -> pygame.Rect:
     return rect
 
 
+def set_name_button_rect(*, hit_padding: int = 0) -> pygame.Rect:
+    rect = pygame.Rect(
+        (SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_WIDTH) / 2,
+        SCREEN_HEIGHT - SCREEN_HEIGHT / 4 + 56,
+        TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    )
+    if hit_padding:
+        rect = rect.inflate(hit_padding * 2, hit_padding * 2)
+    return rect
+
+
 def fullscreen_toggle_rect(*, hit_padding: int = 0) -> pygame.Rect:
     rect = pygame.Rect(
         SCREEN_WIDTH
@@ -122,6 +134,21 @@ def draw_fullscreen_toggle(screen: pygame.Surface) -> None:
     font = pygame.font.Font(None, 28)
     label = font.render("FULLSCREEN", True, TOUCH_CONTROL_TEXT_COLOR)
     rect = fullscreen_toggle_rect()
+    pygame.draw.rect(screen, TOUCH_CONTROLS_TOGGLE_BG_COLOR, rect, border_radius=8)
+    pygame.draw.rect(
+        screen,
+        TOUCH_CONTROLS_TOGGLE_BORDER_COLOR,
+        rect,
+        width=2,
+        border_radius=8,
+    )
+    screen.blit(label, label.get_rect(center=rect.center))
+
+
+def draw_set_name_button(screen: pygame.Surface) -> None:
+    font = pygame.font.Font(None, 28)
+    label = font.render("SET NAME", True, TOUCH_CONTROL_TEXT_COLOR)
+    rect = set_name_button_rect()
     pygame.draw.rect(screen, TOUCH_CONTROLS_TOGGLE_BG_COLOR, rect, border_radius=8)
     pygame.draw.rect(
         screen,
