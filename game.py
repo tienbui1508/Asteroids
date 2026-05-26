@@ -2,11 +2,18 @@ import pygame
 
 from asteroid import Asteroid
 from asteroidfield import AsteroidField
-from constants import SCREEN_HEIGHT, SCREEN_WIDTH
+from constants import (
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    TOUCH_CONTROLS_TOGGLE_MARGIN,
+    TOUCH_CONTROLS_TOGGLE_WIDTH,
+)
 from game_state import START_KEYS, GameState
 from logger import log_event
 from player import Player
 from shot import Shot
+from touch_controls import TouchControls
 from ui import (
     GAME_OVER_LINES,
     GAME_OVER_PROMPT,
@@ -16,6 +23,7 @@ from ui import (
     WELCOME_TITLE,
     draw_hud,
     draw_message_screen,
+    draw_touch_controls_toggle,
 )
 
 
@@ -38,6 +46,8 @@ class Game:
 
         self.asteroid_field = AsteroidField()
         self.player = Player(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+        self.touch_controls = TouchControls(enabled=False)
+        self.player.touch_controls = self.touch_controls
 
     def reset(self) -> None:
         for sprite in list(self.asteroids):
@@ -48,6 +58,7 @@ class Game:
         self.player.position.update(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
         self.player.rotation = 0
         self.player.shoot_cooldown_timer = 0
+        self.player.color = "green"
         self.asteroid_field.spawn_timer = 0.0
         self.score = 0
 
@@ -55,17 +66,54 @@ class Game:
         self.reset()
         self.state = GameState.PLAYING
 
+    def _menu_tap(self, event: pygame.event.Event) -> bool:
+        if event.type == pygame.FINGERDOWN:
+            return True
+        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+
+    def _event_pos(self, event: pygame.event.Event) -> pygame.Vector2 | None:
+        if event.type in (pygame.FINGERDOWN, pygame.FINGERUP, pygame.FINGERMOTION):
+            return pygame.Vector2(event.x * SCREEN_WIDTH, event.y * SCREEN_HEIGHT)
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+            if getattr(event, "button", 0) == 1:
+                return pygame.Vector2(event.pos)
+        return None
+
+    def _touch_toggle_tap(self, event: pygame.event.Event) -> bool:
+        if event.type != pygame.FINGERDOWN and not (
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+        ):
+            return False
+
+        pos = self._event_pos(event)
+        if pos is None:
+            return False
+
+        rect = pygame.Rect(
+            SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_MARGIN - TOUCH_CONTROLS_TOGGLE_WIDTH,
+            TOUCH_CONTROLS_TOGGLE_MARGIN,
+            TOUCH_CONTROLS_TOGGLE_WIDTH,
+            TOUCH_CONTROLS_TOGGLE_HEIGHT,
+        )
+        return rect.collidepoint(pos.x, pos.y)
+
     def handle_event(self, event: pygame.event.Event) -> bool:
         """Return True when the app should quit."""
         if event.type == pygame.QUIT:
             return True
 
-        if (
-            event.type == pygame.KEYDOWN
-            and event.key in START_KEYS
-            and self.state in (GameState.WELCOME, GameState.GAME_OVER)
-        ):
-            self.start_playing()
+        if self.state in (GameState.WELCOME, GameState.GAME_OVER):
+            if event.type == pygame.KEYDOWN and event.key in START_KEYS:
+                self.start_playing()
+            elif self._menu_tap(event):
+                self.start_playing()
+            return False
+
+        if self.state == GameState.PLAYING:
+            if self._touch_toggle_tap(event):
+                self.touch_controls.set_enabled(not self.touch_controls.enabled)
+            else:
+                self.touch_controls.handle_event(event)
 
         return False
 
@@ -91,6 +139,8 @@ class Game:
             if self.player.collides_with(asteroid):
                 log_event("player_hit")
                 self.state = GameState.GAME_OVER
+                self.player.color = "red"
+                self.touch_controls.reset()
                 return
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -106,6 +156,8 @@ class Game:
 
         if self.state == GameState.PLAYING:
             draw_hud(screen, self.score)
+            draw_touch_controls_toggle(screen, self.touch_controls.enabled)
+            self.touch_controls.draw(screen)
         else:
             draw_message_screen(
                 screen,

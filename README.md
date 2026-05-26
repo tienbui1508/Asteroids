@@ -50,6 +50,8 @@ Open the URL printed in the terminal (usually `http://localhost:8000`).
 | A / D or ← / → | Rotate |
 | Space | Shoot |
 | Enter | Start or restart after game over |
+| Touch (web / mobile) | Joystick (bottom-left) to fly; FIRE (bottom-right) to shoot |
+| Tap | Start or restart on welcome / game over screens |
 
 ### Features
 
@@ -67,6 +69,7 @@ game.py          Game state, collisions, score
 game_state.py    State enum and menu keys
 ui.py            Menus and HUD rendering
 player.py        Player ship
+touch_controls.py On-screen joystick and fire button
 asteroid.py      Asteroids and splitting
 asteroidfield.py Spawner
 shot.py          Projectiles

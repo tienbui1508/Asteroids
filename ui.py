@@ -1,19 +1,30 @@
 import pygame
 
-from constants import COLOR_FOREGROUND, SCREEN_HEIGHT, SCREEN_WIDTH
+from constants import (
+    COLOR_FOREGROUND,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    TOUCH_CONTROLS_TOGGLE_BORDER_COLOR,
+    TOUCH_CONTROLS_TOGGLE_BG_COLOR,
+    TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    TOUCH_CONTROLS_TOGGLE_MARGIN,
+    TOUCH_CONTROLS_TOGGLE_WIDTH,
+    TOUCH_CONTROL_TEXT_COLOR,
+)
 
 WELCOME_TITLE = "ASTEROIDS"
 WELCOME_LINES = [
     "W / S : thrust forward and backward",
     "A / D : rotate",
     "SPACE : shoot",
+    "Touch: joystick to fly, FIRE to shoot",
     "Destroy asteroids. Don't get hit.",
 ]
-WELCOME_PROMPT = "Press ENTER to play"
+WELCOME_PROMPT = "Press ENTER or tap to play"
 
 GAME_OVER_TITLE = "GAME OVER"
 GAME_OVER_LINES = ["You were hit by an asteroid."]
-GAME_OVER_PROMPT = "Press ENTER to play again"
+GAME_OVER_PROMPT = "Press ENTER or tap to play again"
 
 
 def draw_message_screen(
@@ -53,3 +64,27 @@ def draw_hud(screen: pygame.Surface, score: int) -> None:
     font = pygame.font.Font(None, 36)
     label = font.render(f"Score: {score}", True, COLOR_FOREGROUND)
     screen.blit(label, (16, 16))
+
+
+def draw_touch_controls_toggle(screen: pygame.Surface, enabled: bool) -> None:
+    font = pygame.font.Font(None, 28)
+    label = font.render(
+        f"TOUCH: {'ON' if enabled else 'OFF'}",
+        True,
+        TOUCH_CONTROL_TEXT_COLOR,
+    )
+    rect = pygame.Rect(
+        SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_MARGIN - TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_MARGIN,
+        TOUCH_CONTROLS_TOGGLE_WIDTH,
+        TOUCH_CONTROLS_TOGGLE_HEIGHT,
+    )
+    pygame.draw.rect(screen, TOUCH_CONTROLS_TOGGLE_BG_COLOR, rect, border_radius=8)
+    pygame.draw.rect(
+        screen,
+        TOUCH_CONTROLS_TOGGLE_BORDER_COLOR,
+        rect,
+        width=2,
+        border_radius=8,
+    )
+    screen.blit(label, label.get_rect(center=rect.center))

@@ -12,6 +12,7 @@ from constants import (
     SHOT_RADIUS,
 )
 from shot import Shot
+from touch_controls import TouchControls, TouchMovement
 
 
 class Player(CircleShape):
@@ -19,6 +20,8 @@ class Player(CircleShape):
         super().__init__(x, y, radius=PLAYER_RADIUS)
         self.rotation = 0.0
         self.shoot_cooldown_timer = 0.0
+        self.color = "green"
+        self.touch_controls: TouchControls | None = None
 
     def triangle(self) -> list[pygame.Vector2]:
         forward = pygame.Vector2(0, 1).rotate(self.rotation)
@@ -30,16 +33,37 @@ class Player(CircleShape):
 
     def draw(self, screen: pygame.Surface) -> None:
         pygame.draw.polygon(
-            screen, COLOR_FOREGROUND, self.triangle(), width=LINE_WIDTH
+            screen, self.color, self.triangle(), width=LINE_WIDTH
         )
 
     def rotate(self, dt: float) -> None:
         self.rotation += PLAYER_TURN_SPEED * dt
 
     def update(self, dt: float) -> None:
+        if self.touch_controls is not None and self.touch_controls.joystick_active:
+            movement = self.touch_controls.movement
+            if movement is not None:
+                self._update_from_touch(dt, movement)
+        else:
+            self._update_from_keyboard(dt)
+
+        if self.touch_controls is not None and self.touch_controls.shooting:
+            self.shoot()
+        elif pygame.key.get_pressed()[pygame.K_SPACE]:
+            self.shoot()
+
+        self.shoot_cooldown_timer -= dt
+
+    def _update_from_touch(self, dt: float, movement: TouchMovement) -> None:
+        if movement.heading is not None:
+            self.rotation = movement.heading
+        if movement.thrust > 0:
+            # Match keyboard: once thrust is engaged, move at full speed.
+            self.move(dt)
+
+    def _update_from_keyboard(self, dt: float) -> None:
         keys = pygame.key.get_pressed()
 
-        # WASD + arrow keys for the same controls.
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             self.rotate(-dt)
         if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
@@ -48,14 +72,10 @@ class Player(CircleShape):
             self.move(dt)
         if keys[pygame.K_s] or keys[pygame.K_DOWN]:
             self.move(-dt)
-        if keys[pygame.K_SPACE]:
-            self.shoot()
 
-        self.shoot_cooldown_timer -= dt
-
-    def move(self, dt: float) -> None:
+    def move(self, dt: float, *, speed_scale: float = 1.0) -> None:
         direction = pygame.Vector2(0, 1).rotate(self.rotation)
-        self.position += direction * PLAYER_SPEED * dt
+        self.position += direction * PLAYER_SPEED * dt * speed_scale
         self.wrap_position()
 
     def shoot(self) -> None:
