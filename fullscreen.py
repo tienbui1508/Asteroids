@@ -28,10 +28,32 @@ def toggle_fullscreen() -> None:
             from platform import window  # type: ignore
 
             doc = window.document
-            if getattr(doc, "fullscreenElement", None):
-                doc.exitFullscreen()
-            else:
-                window.canvas.requestFullscreen()
+            fullscreen_el = getattr(doc, "fullscreenElement", None) or getattr(
+                doc, "webkitFullscreenElement", None
+            )
+            if fullscreen_el:
+                exit_fs = getattr(doc, "exitFullscreen", None) or getattr(
+                    doc, "webkitExitFullscreen", None
+                )
+                if callable(exit_fs):
+                    exit_fs()
+                return
+
+            # Try standard + iOS WebKit fullscreen entry points.
+            targets = [
+                getattr(window, "canvas", None),
+                getattr(doc, "documentElement", None),
+                getattr(doc, "body", None),
+            ]
+            for target in targets:
+                if target is None:
+                    continue
+                req = getattr(target, "requestFullscreen", None) or getattr(
+                    target, "webkitRequestFullscreen", None
+                )
+                if callable(req):
+                    req()
+                    return
         except Exception:
             # Fullscreen may fail (permissions, missing API, etc.). Ignore safely.
             return
