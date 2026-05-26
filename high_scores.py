@@ -98,16 +98,33 @@ def _supabase_insert_score(*, player_name: str, score: int) -> None:
     headers["Prefer"] = "return=minimal"
 
     req = Request(url, data=payload, headers=headers, method="POST")
-    with urlopen(req, timeout=3):
-        pass
+    try:
+        with urlopen(req, timeout=5):
+            pass
+    except HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8")
+        except Exception:
+            body = ""
+        raise HTTPError(
+            e.url,
+            e.code,
+            f"{e.reason} body={body}",
+            e.headers,
+            e.fp,
+        ) from e
 
 
 def load_high_scores(path: Path) -> HighScores:
     if _supabase_enabled():
         try:
             return _supabase_fetch_top_scores(HIGH_SCORES_MAX_ENTRIES)
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as e:
-            log_event("high_scores_supabase_load_failed", error=str(e))
+        except Exception as e:
+            log_event(
+                "high_scores_supabase_load_failed",
+                error=f"{type(e).__name__}: {e}",
+            )
 
     try:
         raw = path.read_text(encoding="utf-8")
@@ -128,8 +145,11 @@ def record_high_score(path: Path, *, player_name: str, score: int) -> HighScores
         try:
             _supabase_insert_score(player_name=sanitized_name, score=sanitized_score)
             return _supabase_fetch_top_scores(HIGH_SCORES_MAX_ENTRIES)
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as e:
-            log_event("high_scores_supabase_save_failed", error=str(e))
+        except Exception as e:
+            log_event(
+                "high_scores_supabase_save_failed",
+                error=f"{type(e).__name__}: {e}",
+            )
 
     scores = load_high_scores(path)
     scores.entries.append({"name": sanitized_name, "score": sanitized_score})
