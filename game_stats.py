@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from constants import (
     GAME_STATS_FILE,
@@ -15,6 +15,7 @@ from constants import (
     SUPABASE_URL,
 )
 from logger import log_event
+from http_transport import request_json
 
 
 def _supabase_enabled() -> bool:
@@ -22,10 +23,10 @@ def _supabase_enabled() -> bool:
 
 
 def _supabase_headers() -> dict[str, str]:
+    # `apikey` is sufficient for anon access and avoids extra auth-header quirks in browser WASM.
     key = SUPABASE_ANON_KEY or ""
     return {
         "apikey": key,
-        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
 
@@ -42,10 +43,7 @@ def _supabase_fetch_games_played() -> int:
         f"&id=eq.{GAME_STATS_ROW_ID}"
         f"&limit=1"
     )
-    req = Request(url, headers=_supabase_headers(), method="GET")
-    with urlopen(req, timeout=5) as resp:
-        raw = resp.read().decode("utf-8")
-    data = json.loads(raw)
+    data = request_json(method="GET", url=url, headers=_supabase_headers())
     if not isinstance(data, list) or not data:
         return 0
     row = data[0]
@@ -59,14 +57,14 @@ def _supabase_fetch_games_played() -> int:
 
 def _supabase_write_games_played(count: int) -> None:
     url = f"{_stats_table_url()}?on_conflict=id"
-    payload = json.dumps(
-        {"id": GAME_STATS_ROW_ID, "games_played": max(0, int(count))}
-    ).encode("utf-8")
     headers = _supabase_headers()
     headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
-    req = Request(url, data=payload, headers=headers, method="POST")
-    with urlopen(req, timeout=5):
-        pass
+    request_json(
+        method="POST",
+        url=url,
+        headers=headers,
+        payload={"id": GAME_STATS_ROW_ID, "games_played": max(0, int(count))},
+    )
 
 
 def _load_local(path: Path) -> int:
@@ -97,12 +95,21 @@ def _save_local(path: Path, count: int) -> None:
 def load_games_played(path: Path) -> int:
     if _supabase_enabled():
         try:
-            return _supabase_fetch_games_played()
+            count = _supabase_fetch_games_played()
+            log_event(
+                "game_stats_supabase_load_ok",
+                games_played=count,
+                platform=sys.platform,
+            )
+            return count
         except Exception as e:
             log_event(
                 "game_stats_supabase_load_failed",
                 error=f"{type(e).__name__}: {e}",
+                platform=sys.platform,
             )
+    else:
+        log_event("game_stats_supabase_disabled", platform=sys.platform)
     return _load_local(path)
 
 
@@ -112,12 +119,20 @@ def record_game_played(path: Path) -> int:
     if _supabase_enabled():
         try:
             _supabase_write_games_played(count)
+            log_event(
+                "game_stats_supabase_save_ok",
+                games_played=count,
+                platform=sys.platform,
+            )
             return count
         except Exception as e:
             log_event(
                 "game_stats_supabase_save_failed",
                 error=f"{type(e).__name__}: {e}",
+                platform=sys.platform,
             )
+    else:
+        log_event("game_stats_supabase_disabled", games_played=count, platform=sys.platform)
 
     _save_local(path, count)
     return count

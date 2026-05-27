@@ -1,6 +1,7 @@
 import inspect
 import json
 import math
+import sys
 from datetime import datetime
 from typing import NotRequired, TypedDict
 
@@ -144,6 +145,18 @@ def log_event(event_type: str, **details: object) -> None:
         "type": event_type,
         **details,
     }
+
+    # In web builds, writing files goes to browser virtual FS.
+    # Mirror logs to stdout + browser console for easy debugging.
+    if sys.platform == "emscripten":
+        serialized = json.dumps(event, ensure_ascii=True)
+        print(serialized)
+        try:
+            from platform import window  # type: ignore
+
+            window.console.log(serialized)
+        except Exception:
+            pass
 
     mode = "w" if not _event_log_initialized else "a"
     with open("game_events.jsonl", mode) as f:

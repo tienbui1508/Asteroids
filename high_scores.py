@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 from typing import TypedDict
 
 from logger import log_event
+from http_transport import request_json
 
 from constants import (
     HIGH_SCORES_DISPLAY_ENTRIES,
@@ -60,11 +60,10 @@ def _supabase_enabled() -> bool:
 
 
 def _supabase_headers() -> dict[str, str]:
-    # Supabase REST requires both `apikey` and `Authorization`.
+    # `apikey` is sufficient for anon access and avoids extra auth-header quirks in browser WASM.
     key = SUPABASE_ANON_KEY or ""
     return {
         "apikey": key,
-        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
 
@@ -80,10 +79,7 @@ def _supabase_fetch_top_scores(limit: int) -> HighScores:
         f"&limit={int(limit)}"
     )
 
-    req = Request(url, headers=_supabase_headers(), method="GET")
-    with urlopen(req, timeout=3) as resp:
-        raw = resp.read().decode("utf-8")
-    data = json.loads(raw)
+    data = request_json(method="GET", url=url, headers=_supabase_headers())
     return HighScores(entries=_safe_parse_entries(data)).trimmed()
 
 
@@ -92,39 +88,35 @@ def _supabase_insert_score(*, player_name: str, score: int) -> None:
     table = SUPABASE_HIGH_SCORES_TABLE
     url = f"{base}/rest/v1/{table}"
 
-    payload = json.dumps({"name": player_name, "score": score}).encode("utf-8")
     headers = _supabase_headers()
-    # Ask Supabase to return the inserted row (not required, but useful when debugging).
     headers["Prefer"] = "return=minimal"
 
-    req = Request(url, data=payload, headers=headers, method="POST")
-    try:
-        with urlopen(req, timeout=5):
-            pass
-    except HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode("utf-8")
-        except Exception:
-            body = ""
-        raise HTTPError(
-            e.url,
-            e.code,
-            f"{e.reason} body={body}",
-            e.headers,
-            e.fp,
-        ) from e
+    request_json(
+        method="POST",
+        url=url,
+        headers=headers,
+        payload={"name": player_name, "score": score},
+    )
 
 
 def load_high_scores(path: Path) -> HighScores:
     if _supabase_enabled():
         try:
-            return _supabase_fetch_top_scores(HIGH_SCORES_MAX_ENTRIES)
+            scores = _supabase_fetch_top_scores(HIGH_SCORES_MAX_ENTRIES)
+            log_event(
+                "high_scores_supabase_load_ok",
+                entries=len(scores.entries),
+                platform=sys.platform,
+            )
+            return scores
         except Exception as e:
             log_event(
                 "high_scores_supabase_load_failed",
                 error=f"{type(e).__name__}: {e}",
+                platform=sys.platform,
             )
+    else:
+        log_event("high_scores_supabase_disabled", platform=sys.platform)
 
     try:
         raw = path.read_text(encoding="utf-8")
@@ -144,12 +136,27 @@ def record_high_score(path: Path, *, player_name: str, score: int) -> HighScores
     if _supabase_enabled():
         try:
             _supabase_insert_score(player_name=sanitized_name, score=sanitized_score)
-            return _supabase_fetch_top_scores(HIGH_SCORES_MAX_ENTRIES)
+            scores = _supabase_fetch_top_scores(HIGH_SCORES_MAX_ENTRIES)
+            log_event(
+                "high_scores_supabase_save_ok",
+                player_name=sanitized_name,
+                score=sanitized_score,
+                entries=len(scores.entries),
+                platform=sys.platform,
+            )
+            return scores
         except Exception as e:
             log_event(
                 "high_scores_supabase_save_failed",
                 error=f"{type(e).__name__}: {e}",
+                platform=sys.platform,
             )
+    else:
+        log_event(
+            "high_scores_supabase_disabled",
+            score=sanitized_score,
+            platform=sys.platform,
+        )
 
     scores = load_high_scores(path)
     scores.entries.append({"name": sanitized_name, "score": sanitized_score})
