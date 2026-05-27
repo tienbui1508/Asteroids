@@ -1,7 +1,13 @@
 import pygame
 
 from circleshape import CircleShape
-from constants import COLOR_FOREGROUND, LINE_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH
+from constants import (
+    COLOR_FOREGROUND,
+    LINE_WIDTH,
+    PLAYFIELD_BOTTOM,
+    PLAYFIELD_TOP,
+    SCREEN_WIDTH,
+)
 
 
 class Shot(CircleShape):
@@ -22,6 +28,6 @@ class Shot(CircleShape):
         return (
             self.position.x < -self.radius
             or self.position.x > SCREEN_WIDTH + self.radius
-            or self.position.y < -self.radius
-            or self.position.y > SCREEN_HEIGHT + self.radius
+            or self.position.y < PLAYFIELD_TOP - self.radius
+            or self.position.y > PLAYFIELD_BOTTOM + self.radius
         )

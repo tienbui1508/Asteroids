@@ -2,6 +2,8 @@ import pygame
 
 from constants import (
     COLOR_FOREGROUND,
+    HUD_BAR_BG_COLOR,
+    HUD_BAR_HEIGHT,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     TOUCH_CONTROLS_TOGGLE_BORDER_COLOR,
@@ -35,9 +37,10 @@ def format_games_played_line(count: int) -> str:
 
 
 def touch_controls_toggle_rect(*, hit_padding: int = 0) -> pygame.Rect:
+    top = (HUD_BAR_HEIGHT - TOUCH_CONTROLS_TOGGLE_HEIGHT) // 2
     rect = pygame.Rect(
         SCREEN_WIDTH - TOUCH_CONTROLS_TOGGLE_MARGIN - TOUCH_CONTROLS_TOGGLE_WIDTH,
-        TOUCH_CONTROLS_TOGGLE_MARGIN,
+        top,
         TOUCH_CONTROLS_TOGGLE_WIDTH,
         TOUCH_CONTROLS_TOGGLE_HEIGHT,
     )
@@ -159,13 +162,14 @@ def draw_welcome_screen(
 
 
 def fullscreen_toggle_rect(*, hit_padding: int = 0) -> pygame.Rect:
+    top = (HUD_BAR_HEIGHT - TOUCH_CONTROLS_TOGGLE_HEIGHT) // 2
     rect = pygame.Rect(
         SCREEN_WIDTH
         - TOUCH_CONTROLS_TOGGLE_MARGIN
         - TOUCH_CONTROLS_TOGGLE_WIDTH
         - TOUCH_CONTROLS_TOGGLE_MARGIN
         - TOUCH_CONTROLS_TOGGLE_WIDTH,
-        TOUCH_CONTROLS_TOGGLE_MARGIN,
+        top,
         TOUCH_CONTROLS_TOGGLE_WIDTH,
         TOUCH_CONTROLS_TOGGLE_HEIGHT,
     )
@@ -297,12 +301,17 @@ def draw_game_over_screen(
 
 
 def draw_hud(screen: pygame.Surface, score: int, player_name: str) -> None:
-    font = pygame.font.Font(None, 36)
-    name_label = font.render(f"{player_name}", True, COLOR_FOREGROUND)
-    screen.blit(name_label, (16, 16))
+    # Keep a dedicated top row for status and controls so gameplay stays visible.
+    hud_bg = pygame.Surface((SCREEN_WIDTH, HUD_BAR_HEIGHT), pygame.SRCALPHA)
+    hud_bg.fill(HUD_BAR_BG_COLOR)
+    screen.blit(hud_bg, (0, 0))
 
-    score_label = font.render(f"Score: {score}", True, COLOR_FOREGROUND)
-    screen.blit(score_label, (16, 16 + 40))
+    font = pygame.font.Font(None, 34)
+    status_label = font.render(
+        f"Player: {player_name}   Score: {score}", True, COLOR_FOREGROUND
+    )
+    status_rect = status_label.get_rect(midleft=(16, HUD_BAR_HEIGHT // 2))
+    screen.blit(status_label, status_rect)
 
 
 def draw_touch_controls_toggle(screen: pygame.Surface, enabled: bool) -> None:
